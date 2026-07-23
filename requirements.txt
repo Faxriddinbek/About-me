@@ -1,0 +1,25 @@
+# Web framework and ASGI server
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Database: async SQLAlchemy 2.0 + drivers (Postgres for prod, SQLite for dev)
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+aiosqlite==0.20.0
+alembic==1.14.0
+
+# Settings and validation
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+
+# HTTP client (Telegram integration in later steps; test client)
+httpx==0.28.1
+
+# Rate limiting
+slowapi==0.1.9
+
+# Testing and linting
+pytest==8.3.4
+pytest-asyncio==0.25.0
+ruff==0.8.6
