@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # which breaks the simple comma-separated form we want operators to use.
     CORS_ORIGINS: str = "http://localhost:3000"
 
+    # --- Proxy ---------------------------------------------------------------
+    # When true, the client IP is read from the X-Forwarded-For header. Enable
+    # ONLY behind a proxy you control, otherwise clients can spoof their IP and
+    # bypass rate limiting. When false the header is ignored.
+    TRUST_PROXY: bool = False
+
     # --- Secrets -------------------------------------------------------------
     ADMIN_TOKEN: str = ""  # required in prod; guards write endpoints
 

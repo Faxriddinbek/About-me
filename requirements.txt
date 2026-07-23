@@ -1,6 +1,7 @@
 # Web framework and ASGI server
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
+gunicorn==23.0.0  # production process manager; runs UvicornWorker workers
 
 # Database: async SQLAlchemy 2.0 + drivers (Postgres for prod, SQLite for dev)
 sqlalchemy[asyncio]==2.0.36
@@ -11,6 +12,7 @@ alembic==1.14.0
 # Settings and validation
 pydantic==2.10.4
 pydantic-settings==2.7.1
+email-validator==2.2.0  # backs pydantic EmailStr
 python-dotenv==1.0.1
 
 # HTTP client (Telegram integration in later steps; test client)

@@ -1,0 +1,4 @@
+# Normalize line endings. Shell scripts MUST stay LF or they break in Linux
+# containers (a CR in the shebang line makes the interpreter lookup fail).
+* text=auto
+*.sh text eol=lf

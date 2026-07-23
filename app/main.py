@@ -14,16 +14,25 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
 
+from app.api.limiter import limiter
 from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
-from app.core.exceptions import register_exception_handlers
+from app.core.exceptions import register_exception_handlers, render_error
 from app.core.logging import configure_logging, get_logger, request_id_ctxvar
 from app.db.session import dispose_engine
 
 logger = get_logger(__name__)
 
 _REQUEST_ID_HEADER = "X-Request-ID"
+
+
+async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Response:
+    """Render slowapi's rate-limit error using the app's standard envelope."""
+    return render_error(
+        429, "rate_limited", "Too many requests. Please slow down."
+    )
 
 
 @asynccontextmanager
@@ -85,6 +94,11 @@ def create_app() -> FastAPI:
 
     _configure_cors(app, settings)
     register_exception_handlers(app)
+
+    # slowapi: expose the shared limiter on app.state (its decorators read it)
+    # and translate rate-limit errors into the standard envelope.
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
     @app.middleware("http")
     async def request_context_middleware(

@@ -76,6 +76,17 @@ def _error_body(code: str, message: str, detail: Any | None) -> dict[str, Any]:
     return {"error": {"code": code, "message": message, "detail": detail}}
 
 
+def render_error(
+    status_code: int, code: str, message: str, detail: Any | None = None
+) -> JSONResponse:
+    """Public helper to emit the standard error envelope.
+
+    Exposed so infrastructure handlers registered outside this module (e.g. the
+    slowapi rate-limit handler in ``main``) can reuse the exact same shape.
+    """
+    return JSONResponse(status_code=status_code, content=_error_body(code, message, detail))
+
+
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     """Translate a domain ``AppError`` (or subclass) into its JSON envelope."""
     return JSONResponse(

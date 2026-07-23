@@ -1,0 +1,47 @@
+# Version control & CI
+.git
+.gitignore
+.gitattributes
+.github/
+
+# Python caches / build artifacts
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tests
+tests/
+
+# Secrets & local databases (env comes from the runtime environment in prod)
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Docker / docs not needed inside the image
+Dockerfile
+docker-compose*.yml
+.dockerignore
