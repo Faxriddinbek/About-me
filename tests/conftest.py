@@ -12,6 +12,7 @@ per-item markers.
 from __future__ import annotations
 
 import os
+import tempfile
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
@@ -22,6 +23,8 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
 os.environ.setdefault("ADMIN_TOKEN", "test-admin-token")
 os.environ.setdefault("TRUST_PROXY", "true")
+# A throwaway directory, so uploads in tests never touch the working tree.
+os.environ.setdefault("UPLOAD_DIR", tempfile.mkdtemp(prefix="portfolio-uploads-"))
 
 import httpx  # noqa: E402  — imported after the environment is configured
 import pytest  # noqa: E402

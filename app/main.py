@@ -7,6 +7,7 @@ trivial to build isolated app instances in tests with overridden settings.
 
 from __future__ import annotations
 
+import os
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -35,6 +36,30 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Respo
     )
 
 
+def _check_upload_dir(settings: Settings) -> None:
+    """Warn at startup if uploaded images cannot be written or would be lost.
+
+    Both failures are silent otherwise: a read-only mount only surfaces when
+    someone tries to upload, and a missing volume only surfaces after a deploy
+    has already thrown the images away. Startup is where an operator will see it.
+    """
+    try:
+        path = settings.upload_path
+        probe = path / ".write-test"
+        probe.write_bytes(b"")
+        probe.unlink()
+    except OSError as exc:
+        logger.error("Upload directory %s is not writable: %s", settings.UPLOAD_DIR, exc)
+        return
+
+    if settings.is_prod and not os.path.ismount(path):
+        logger.warning(
+            "UPLOAD_DIR (%s) is not a mount point. Uploaded images will be lost "
+            "on the next deploy unless a persistent volume is mounted there.",
+            path,
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Manage startup and shutdown side effects.
@@ -49,6 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings.APP_VERSION,
         settings.ENVIRONMENT,
     )
+    _check_upload_dir(settings)
     yield
     await dispose_engine()
     logger.info("Shutdown complete; database engine disposed.")

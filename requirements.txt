@@ -1,5 +1,6 @@
 # Web framework and ASGI server
 fastapi==0.115.6
+python-multipart==0.0.20  # FastAPI needs it to parse multipart file uploads
 uvicorn[standard]==0.34.0
 gunicorn==23.0.0  # production process manager; runs UvicornWorker workers
 

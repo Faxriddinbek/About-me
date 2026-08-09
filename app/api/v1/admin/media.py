@@ -4,12 +4,19 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from pydantic import BaseModel
 
-from app.api.deps import MediaServiceDep, PaginationParams, require_admin
+from app.api.deps import FileStorageDep, MediaServiceDep, PaginationParams, require_admin
 from app.models import MediaPlacement, MediaType
 from app.schemas.common import Page
 from app.schemas.media import MediaAdminOut, MediaCreate, MediaOut, MediaUpdate
+
+
+class UploadOut(BaseModel):
+    """Where an uploaded file now lives, ready to be stored on a media item."""
+
+    url: str
 
 router = APIRouter(
     prefix="/admin/media",
@@ -44,6 +51,24 @@ async def list_media(
         limit=pagination.limit,
         offset=pagination.offset,
     )
+
+
+@router.post(
+    "/upload",
+    response_model=UploadOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Upload an image",
+    description=(
+        "Store an image file and return the URL to serve it from. Create the "
+        "media item separately with that URL — uploading and recording are kept "
+        "apart so a failed save never orphans a row. Requires a valid "
+        "X-Admin-Token."
+    ),
+)
+async def upload_file(
+    storage: FileStorageDep, file: Annotated[UploadFile, File()]
+) -> UploadOut:
+    return UploadOut(url=await storage.save(file))
 
 
 @router.post(

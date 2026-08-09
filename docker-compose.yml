@@ -40,6 +40,8 @@ services:
       - ./app:/app/app
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
+      # Uploaded images, on the host so they survive `docker compose down`.
+      - ./uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
