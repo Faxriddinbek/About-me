@@ -1,5 +1,5 @@
 {
-  "_comment": "Sample content so the site is not empty. Replace title/description/tags/link with your real work — this file is the only thing you need to edit.",
+  "_comment": "Sample content so the site is not empty. Replace title/description/tags/link with your real work — this file is the only thing you need to edit. Media is easier to manage from the admin panel at /admin; this list is only a starting point.",
 
   "projects": [
     {
@@ -40,6 +40,7 @@
   "media": [
     {
       "media_type": "photo",
+      "placement": "gallery",
       "url": "/assets/avatar.webp",
       "thumbnail_url": null,
       "title_uz": "Portret",
@@ -49,6 +50,7 @@
     },
     {
       "media_type": "photo",
+      "placement": "gallery",
       "url": "/assets/matrix-bg.webp",
       "thumbnail_url": null,
       "title_uz": "Kod yomg‘iri",
@@ -58,6 +60,7 @@
     },
     {
       "media_type": "photo",
+      "placement": "gallery",
       "url": "/uploads/pasted-1784737187329-0.webp",
       "thumbnail_url": null,
       "title_uz": "Ish stoli",

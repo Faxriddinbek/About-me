@@ -6,7 +6,7 @@ Alembic's ``--autogenerate`` discovers the full schema. Each model subclasses
 """
 
 from app.models.contact import ContactMessage
-from app.models.media import MediaItem, MediaType
+from app.models.media import MediaItem, MediaPlacement, MediaType
 from app.models.project import Project
 
-__all__ = ["ContactMessage", "MediaItem", "MediaType", "Project"]
+__all__ = ["ContactMessage", "MediaItem", "MediaPlacement", "MediaType", "Project"]

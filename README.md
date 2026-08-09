@@ -114,12 +114,17 @@ ASGI client).
 | GET    | `/health`                               | —     | Liveness probe.                    |
 | GET    | `/api/v1/projects?lang=uz&limit=&offset=` | —   | List visible projects.             |
 | GET    | `/api/v1/projects/{id}?lang=uz`         | —     | Get one project.                   |
-| GET    | `/api/v1/media?type=photo&lang=uz`      | —     | List visible media (`type` optional). |
+| GET    | `/api/v1/media?type=photo&placement=gallery&lang=uz` | — | List visible media (both filters optional). |
 | POST   | `/api/v1/contact`                       | —     | Submit a message (3/hour per IP).  |
 | POST/PATCH/DELETE | `/api/v1/admin/projects[/{id}]` | admin | Manage projects.                   |
+| GET    | `/api/v1/admin/media`                   | admin | List every media item, hidden included. |
 | POST/PATCH/DELETE | `/api/v1/admin/media[/{id}]`    | admin | Manage media.                      |
 | GET    | `/api/v1/admin/contacts?unread_only=`   | admin | List contact messages.             |
 | PATCH  | `/api/v1/admin/contacts/{id}/read`      | admin | Mark a message read.               |
+
+A media item's `placement` decides where it appears: `hero` is the home-page
+carousel, `gallery` (the default) is the media section. Both live in one table
+because they are the same kind of asset, differing only in where they surface.
 
 Admin requests send `X-Admin-Token: <ADMIN_TOKEN>`. Errors use one envelope:
 

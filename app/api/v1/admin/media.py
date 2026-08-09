@@ -1,17 +1,49 @@
-"""Admin media management endpoints (create / update / delete)."""
+"""Admin media management endpoints (list / create / update / delete)."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, status
+from typing import Annotated
 
-from app.api.deps import MediaServiceDep, require_admin
-from app.schemas.media import MediaCreate, MediaOut, MediaUpdate
+from fastapi import APIRouter, Depends, Query, status
+
+from app.api.deps import MediaServiceDep, PaginationParams, require_admin
+from app.models import MediaPlacement, MediaType
+from app.schemas.common import Page
+from app.schemas.media import MediaAdminOut, MediaCreate, MediaOut, MediaUpdate
 
 router = APIRouter(
     prefix="/admin/media",
     tags=["admin:media"],
     dependencies=[Depends(require_admin)],
 )
+
+
+@router.get(
+    "",
+    response_model=Page[MediaAdminOut],
+    status_code=status.HTTP_200_OK,
+    summary="List every media item",
+    description=(
+        "List all media items, hidden ones included, with both language columns "
+        "unresolved. Requires a valid X-Admin-Token."
+    ),
+)
+async def list_media(
+    service: MediaServiceDep,
+    pagination: PaginationParams,
+    media_type: Annotated[
+        MediaType | None, Query(alias="type", description="Filter by media type.")
+    ] = None,
+    placement: Annotated[
+        MediaPlacement | None, Query(description="Filter by placement.")
+    ] = None,
+) -> Page[MediaAdminOut]:
+    return await service.list_all(
+        media_type=media_type,
+        placement=placement,
+        limit=pagination.limit,
+        offset=pagination.offset,
+    )
 
 
 @router.post(
