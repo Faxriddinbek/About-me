@@ -32,7 +32,9 @@ services:
       ADMIN_TOKEN: dev-admin-token
       TRUST_PROXY: "false"
     ports:
-      - "8000:8000"
+      # Host port is overridable because 8000 is often already taken by another
+      # local stack; the container always listens on 8000 internally.
+      - "${API_PORT:-8001}:8000"
     volumes:
       # Mount source for hot reload (the baked-in venv is used as-is).
       - ./app:/app/app

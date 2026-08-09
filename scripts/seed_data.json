@@ -1,0 +1,69 @@
+{
+  "_comment": "Sample content so the site is not empty. Replace title/description/tags/link with your real work — this file is the only thing you need to edit.",
+
+  "projects": [
+    {
+      "title_uz": "Yarrow Microservices Platform",
+      "title_en": "Yarrow Microservices Platform",
+      "description_uz": "API Gateway ortidagi mikroservis platformasi: auth, user, billing, media va geocoding servislari. gRPC bilan servislararo aloqa.",
+      "description_en": "Microservice platform behind an API gateway: auth, user, billing, media and geocoding services, communicating over gRPC.",
+      "tags": ["Python", "FastAPI", "gRPC", "PostgreSQL", "Docker"],
+      "image_url": null,
+      "link": null,
+      "display_order": 1,
+      "is_visible": true
+    },
+    {
+      "title_uz": "Portfolio Backend API",
+      "title_en": "Portfolio Backend API",
+      "description_uz": "Ushbu saytning backendi. Async SQLAlchemy 2.0, Alembic migratsiyalari, ikki tilli kontent, rate limiting va Telegram bildirishnomalari.",
+      "description_en": "The backend powering this site: async SQLAlchemy 2.0, Alembic migrations, bilingual content, rate limiting and Telegram notifications.",
+      "tags": ["Python", "FastAPI", "PostgreSQL", "Alembic"],
+      "image_url": null,
+      "link": "https://github.com/Faxriddinbek/About-me",
+      "display_order": 2,
+      "is_visible": true
+    },
+    {
+      "title_uz": "Map Editor Backend",
+      "title_en": "Map Editor Backend",
+      "description_uz": "Xarita muharriri uchun backend: geometriya saqlash, versiyalash va gRPC orqali xizmatlararo integratsiya.",
+      "description_en": "Backend for a map editor: geometry storage, versioning and service-to-service integration over gRPC.",
+      "tags": ["Python", "FastAPI", "PostGIS", "gRPC"],
+      "image_url": null,
+      "link": null,
+      "display_order": 3,
+      "is_visible": true
+    }
+  ],
+
+  "media": [
+    {
+      "media_type": "photo",
+      "url": "/assets/avatar.webp",
+      "thumbnail_url": null,
+      "title_uz": "Portret",
+      "title_en": "Portrait",
+      "display_order": 1,
+      "is_visible": true
+    },
+    {
+      "media_type": "photo",
+      "url": "/assets/matrix-bg.webp",
+      "thumbnail_url": null,
+      "title_uz": "Kod yomg‘iri",
+      "title_en": "Code rain",
+      "display_order": 2,
+      "is_visible": true
+    },
+    {
+      "media_type": "photo",
+      "url": "/uploads/pasted-1784737187329-0.webp",
+      "thumbnail_url": null,
+      "title_uz": "Ish stoli",
+      "title_en": "Workspace",
+      "display_order": 3,
+      "is_visible": true
+    }
+  ]
+}
