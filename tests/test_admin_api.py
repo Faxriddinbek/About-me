@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import httpx
@@ -112,6 +113,26 @@ async def test_admin_media_full_crud(client: httpx.AsyncClient) -> None:
     )
     assert deleted.status_code == 204
     assert (await client.get("/api/v1/media")).json()["total"] == 0
+
+
+async def test_body_the_server_cannot_parse_is_a_422_not_a_500(
+    client: httpx.AsyncClient,
+) -> None:
+    """A body that cannot be read as JSON must still come back as a 422.
+
+    The validation error echoes the unparsed request as raw bytes. Handed to
+    ``JSONResponse`` as-is those bytes cannot be encoded, the handler fails
+    inside the error path, and the caller gets an opaque 500 instead of being
+    told what was wrong with the request.
+    """
+    resp = await client.post(
+        "/api/v1/admin/media",
+        content=json.dumps(_media_payload()),
+        headers={**ADMIN_HEADERS, "Content-Type": "text/plain"},
+    )
+
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "validation_error"
 
 
 async def test_admin_media_list_paginates_with_offset(client: httpx.AsyncClient) -> None:
