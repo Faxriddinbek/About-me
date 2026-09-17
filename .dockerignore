@@ -20,6 +20,10 @@ env/
 # Tests
 tests/
 
+# Locally uploaded images: user content that belongs on the mounted volume, not
+# baked into the image (where it would also bloat the build context).
+uploads/
+
 # Secrets & local databases (env comes from the runtime environment in prod)
 .env
 .env.*

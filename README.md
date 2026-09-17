@@ -88,6 +88,8 @@ Every variable is documented in [`.env.example`](.env.example).
 | `CORS_ORIGINS`       | no                  | `http://localhost:3000`             | Comma-separated allowed frontend origins (no trailing slash).              |
 | `TRUST_PROXY`        | no                  | `false`                             | Trust `X-Forwarded-For` for the client IP. Enable only behind a proxy.     |
 | `ADMIN_TOKEN`        | **yes (prod)**      | *(empty)*                           | Bearer-style token for admin endpoints (sent as `X-Admin-Token`).          |
+| `UPLOAD_DIR`         | no                  | `/data/uploads` (image)             | Where uploads are stored. Under Docker leave it unset — the volume is mounted there. |
+| `MAX_UPLOAD_MB`      | no                  | `15`                                | Per-file upload ceiling, enforced while streaming.                         |
 | `TELEGRAM_BOT_TOKEN` | no                  | *(empty)*                           | Enables Telegram contact notifications. Empty ⇒ notifications are skipped. |
 | `TELEGRAM_CHAT_ID`   | no                  | *(empty)*                           | Chat/channel that receives notifications.                                  |
 | `WEB_CONCURRENCY`    | no                  | `2`                                 | Gunicorn worker count (production entrypoint only).                        |
@@ -132,8 +134,15 @@ Uploads are stored by this service rather than a hosted image CDN, because the
 usual providers refuse sign-ups from Uzbekistan. Only image extensions are
 accepted, the stored filename is random (so a client filename can never steer a
 write), and the size limit is enforced while streaming rather than trusting
-`Content-Length`. **`UPLOAD_DIR` must point at a persistent volume in
-production** — see `.env.example`.
+`Content-Length`.
+
+Uploads are written to `UPLOAD_DIR`, which both images and compose files set to
+`/data/uploads` — the path `docker-compose.prod.yml` mounts the `uploads_data`
+volume over, and the dev compose binds to `./uploads`. **Do not set
+`UPLOAD_DIR` in `.env`**: that overrides the mount and puts the images inside
+the container, where the next `up --build` discards them while the database
+keeps serving their URLs. In production the app logs a warning at startup when
+the directory is not a mount point, which is how that mistake announces itself.
 
 Admin requests send `X-Admin-Token: <ADMIN_TOKEN>`. Errors use one envelope:
 
@@ -141,17 +150,19 @@ Admin requests send `X-Admin-Token: <ADMIN_TOKEN>`. Errors use one envelope:
 { "error": { "code": "not_found", "message": "…", "detail": null } }
 ```
 
-## Deploying to a Linux VPS (Oracle Cloud Always Free)
+## Deploying to a Linux VPS
 
-These steps assume an **Ubuntu 22.04** Always Free instance (Ampere A1 works well)
-and a domain name pointed at the instance's public IP.
+Everything runs on one machine through Docker Compose: Postgres, the API, and
+the volume holding the uploaded images. These steps assume **Ubuntu 22.04** and
+a domain name pointed at the server's public IP.
 
 ### 1. Open the ports
 
-Oracle Cloud blocks traffic in two places — open **both**:
+Some providers (Oracle Cloud among them) block traffic in two places — open
+**both**:
 
-1. **VCN Security List / Network Security Group** (OCI console): add ingress
-   rules allowing TCP `80` and `443` from `0.0.0.0/0`.
+1. **Provider firewall** (the cloud console's security list / security group):
+   allow inbound TCP `80` and `443` from `0.0.0.0/0`.
 2. **Host firewall** on the VM:
 
    ```bash
@@ -181,6 +192,7 @@ cp .env.example .env
 #   ADMIN_TOKEN=<a long random secret>
 #   CORS_ORIGINS=https://your-portfolio.vercel.app
 #   TRUST_PROXY=true                    # nginx sets X-Forwarded-For
+#   (leave UPLOAD_DIR unset — the compose file mounts the uploads volume)
 nano .env
 
 docker compose -f docker-compose.prod.yml up -d --build
@@ -188,6 +200,11 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 The API is now published on `127.0.0.1:8000` (localhost only). Migrations ran
 automatically on startup.
+
+Two named volumes now hold everything that must outlive a container:
+`postgres_data` (the database) and `uploads_data` (the images). Re-running the
+command above rebuilds the containers and leaves both untouched — that is what
+makes a deploy safe to repeat.
 
 ### 4. nginx reverse proxy
 
@@ -225,6 +242,35 @@ certbot edits the nginx config to serve HTTPS and sets up automatic renewal.
 Verify: `curl https://api.yourdomain.com/health` → `{"status":"ok",...}`.
 
 To deploy updates: `git pull && docker compose -f docker-compose.prod.yml up -d --build`.
+The database and the uploaded images live in volumes, so they survive this.
+
+### 6. Checking the images survive a deploy
+
+Worth doing once, right after the first deploy — a broken volume is invisible
+until the images are already gone:
+
+```bash
+# Upload something through the admin panel first, then:
+docker compose -f docker-compose.prod.yml exec api ls -l /data/uploads
+docker compose -f docker-compose.prod.yml up -d --build   # redeploy
+docker compose -f docker-compose.prod.yml exec api ls -l /data/uploads
+```
+
+The same files must be listed both times, and the startup logs
+(`docker compose -f docker-compose.prod.yml logs api`) must **not** contain the
+"UPLOAD_DIR … is not a mount point" warning.
+
+Both volumes belong in your backups:
+
+```bash
+docker compose -f docker-compose.prod.yml exec -T db \
+    pg_dump -U portfolio portfolio > db-$(date +%F).sql
+docker run --rm -v portfolio-backend_uploads_data:/data -v "$PWD:/out" \
+    busybox tar czf /out/uploads-$(date +%F).tar.gz -C /data .
+```
+
+(The volume is prefixed with the compose project name — `docker volume ls`
+shows the exact name on your machine.)
 
 ## Connecting the frontend
 
