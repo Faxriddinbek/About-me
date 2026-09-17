@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import logging
 import sys
 import time
 from pathlib import Path
@@ -32,7 +31,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sqlalchemy import select  # noqa: E402
 
 from app.core.config import get_settings  # noqa: E402
-from app.db.session import async_session_factory, dispose_engine  # noqa: E402
+from app.db.session import (  # noqa: E402
+    async_session_factory,
+    dispose_engine,
+    engine,
+)
 from app.models import MediaItem, Project  # noqa: E402
 from app.services.storage import FileStorage  # noqa: E402
 
@@ -87,9 +90,11 @@ def human_size(total_bytes: int) -> str:
 
 
 async def run(*, delete: bool, min_age_minutes: int) -> int:
-    # With DEBUG on, the engine echoes every statement, which would bury the
-    # report this script exists to print.
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    # With DEBUG on the engine echoes every statement, which would bury the
+    # report this script exists to print. Raising the log level does not help:
+    # `echo` sets its own level on a per-engine logger. Turning the flag off is
+    # what actually silences it.
+    engine.echo = False
 
     settings = get_settings()
     upload_dir = settings.upload_path

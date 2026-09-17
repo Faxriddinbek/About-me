@@ -22,18 +22,17 @@ from app.db.session import get_session
 from app.main import create_app
 from app.services.storage import FileStorage
 from scripts.cleanup_orphans import select_orphans
-from tests.conftest import ADMIN_HEADERS
-from tests.test_files_api import PNG_BYTES, upload_files
+from tests.conftest import ADMIN_HEADERS, make_image, upload_files
 
 ADMIN_MEDIA = "/api/v1/admin/media"
 UPLOAD_URL = f"{ADMIN_MEDIA}/upload"
 YOUTUBE_URL = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
-async def _upload(client: httpx.AsyncClient, name: str = "photo.png") -> str:
+async def _upload(client: httpx.AsyncClient, name: str = "photo.jpg") -> str:
     """Upload an image and return its URL."""
     response = await client.post(
-        UPLOAD_URL, headers=ADMIN_HEADERS, files=upload_files(name, PNG_BYTES)
+        UPLOAD_URL, headers=ADMIN_HEADERS, files=upload_files(name, make_image(200, 150))
     )
     assert response.status_code == 201
     return response.json()["url"]
@@ -212,16 +211,18 @@ class TestOrphanSelection:
         used = tmp_path / "used.png"
         stray = tmp_path / "stray.png"
         for path in (used, stray):
-            path.write_bytes(PNG_BYTES)
+            path.write_bytes(make_image(10, 10, fmt="PNG"))
 
-        orphans = select_orphans([used, stray], {"used.png"}, cutoff=time.time())
+        # A cutoff in the future: age is the *other* rule, exercised below, and
+        # comparing against "now" makes the result depend on clock resolution.
+        orphans = select_orphans([used, stray], {"used.png"}, cutoff=time.time() + 60)
 
         assert orphans == [stray]
 
     def test_spares_files_that_are_too_young(self, tmp_path: Path) -> None:
         """A just-uploaded file may belong to an admin form nobody saved yet."""
         fresh = tmp_path / "fresh.png"
-        fresh.write_bytes(PNG_BYTES)
+        fresh.write_bytes(make_image(10, 10, fmt="PNG"))
 
         orphans = select_orphans([fresh], set(), cutoff=time.time() - 3600)
 

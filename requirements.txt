@@ -10,6 +10,9 @@ asyncpg==0.30.0
 aiosqlite==0.20.0
 alembic==1.14.0
 
+# Image processing: uploads are re-encoded into web-sized WebP derivatives
+pillow==12.3.0
+
 # Settings and validation
 pydantic==2.10.4
 pydantic-settings==2.7.1
