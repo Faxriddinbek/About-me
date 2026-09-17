@@ -136,6 +136,12 @@ accepted, the stored filename is random (so a client filename can never steer a
 write), and the size limit is enforced while streaming rather than trusting
 `Content-Length`.
 
+Deleting a media item deletes the file behind it, as does replacing its `url` —
+but only after the transaction commits, and only for files this service stored
+(a YouTube link or an external image is left alone). The inverse order would be
+the unrecoverable one: a row pointing at a file that no longer exists. Debris
+that escapes anyway is collected by `scripts/cleanup_orphans.py`.
+
 Uploads are written to `UPLOAD_DIR`, which both images and compose files set to
 `/data/uploads` — the path `docker-compose.prod.yml` mounts the `uploads_data`
 volume over, and the dev compose binds to `./uploads`. **Do not set
@@ -271,6 +277,26 @@ docker run --rm -v portfolio-backend_uploads_data:/data -v "$PWD:/out" \
 
 (The volume is prefixed with the compose project name — `docker volume ls`
 shows the exact name on your machine.)
+
+### 7. Clearing out orphaned uploads
+
+Files with nothing pointing at them still appear over time: an image uploaded
+into the admin form that was never saved, a deletion that failed, a row removed
+by hand. `scripts/cleanup_orphans.py` finds them. It runs inside the container,
+where both the database and the uploads are reachable:
+
+```bash
+# report only — deletes nothing
+docker compose -f docker-compose.prod.yml exec api python scripts/cleanup_orphans.py
+
+# actually remove them
+docker compose -f docker-compose.prod.yml exec api python scripts/cleanup_orphans.py --delete
+```
+
+It considers media files, media cover images and project screenshots — hidden
+rows included, which is why it reads the database rather than the API — and it
+skips anything uploaded in the last hour (`--min-age-minutes`), so a file still
+sitting in an unsaved admin form is never taken away.
 
 ## Connecting the frontend
 

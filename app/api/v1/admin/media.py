@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Query, UploadFile, status
 from pydantic import BaseModel
 
 from app.api.deps import FileStorageDep, MediaServiceDep, PaginationParams, require_admin
@@ -89,13 +89,17 @@ async def create_media(payload: MediaCreate, service: MediaServiceDep) -> MediaO
     summary="Update a media item",
     description=(
         "Partially update a media item. Requires a valid X-Admin-Token. "
-        "Responds 404 if the item does not exist."
+        "Responds 404 if the item does not exist. Replacing a url deletes the "
+        "file it pointed at, once the change is committed."
     ),
 )
 async def update_media(
-    media_id: int, payload: MediaUpdate, service: MediaServiceDep
+    media_id: int,
+    payload: MediaUpdate,
+    service: MediaServiceDep,
+    background: BackgroundTasks,
 ) -> MediaOut:
-    return await service.update(media_id, payload)
+    return await service.update(media_id, payload, background=background)
 
 
 @router.delete(
@@ -104,9 +108,12 @@ async def update_media(
     response_model=None,  # 204 carries no body; suppress response-model inference
     summary="Delete a media item",
     description=(
-        "Delete a media item. Requires a valid X-Admin-Token. "
-        "Responds 404 if the item does not exist."
+        "Delete a media item, and the uploaded file behind it once the deletion "
+        "is committed. External links (YouTube and the like) are left alone. "
+        "Requires a valid X-Admin-Token. Responds 404 if the item does not exist."
     ),
 )
-async def delete_media(media_id: int, service: MediaServiceDep) -> None:
-    await service.delete(media_id)
+async def delete_media(
+    media_id: int, service: MediaServiceDep, background: BackgroundTasks
+) -> None:
+    await service.delete(media_id, background=background)
