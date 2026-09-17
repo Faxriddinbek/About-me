@@ -38,6 +38,16 @@ COPY --chown=app:app . .
 # there (e.g. the SQLite fallback file when no Postgres DATABASE_URL is set).
 RUN chmod +x /app/start.sh && chown app:app /app
 
+# Uploads live outside /app, on a directory the compose file mounts a volume
+# over. Creating it here — owned by the app user — is what makes that work:
+# Docker seeds an empty named volume from the image, ownership included, so the
+# non-root process finds a writable directory instead of a root-owned mount.
+RUN mkdir -p /data/uploads && chown -R app:app /data
+
+# Default to the mounted path, so a deployment that forgets to set UPLOAD_DIR
+# still writes somewhere persistent rather than into the container's own layer.
+ENV UPLOAD_DIR=/data/uploads
+
 USER app
 
 EXPOSE 8000

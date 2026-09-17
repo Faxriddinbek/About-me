@@ -23,6 +23,14 @@ services:
       target: runtime
     restart: unless-stopped
     env_file: .env
+    volumes:
+      # Admin-uploaded images. Without this volume they would live inside the
+      # container, which `up --build` replaces on every deploy — the images
+      # would be gone while the database kept serving their URLs.
+      #
+      # Leave UPLOAD_DIR unset in .env so the image default (/data/uploads)
+      # applies; setting it there would point the app away from this volume.
+      - uploads_data:/data/uploads
     # Publish only to localhost; nginx on the host terminates TLS and proxies in.
     ports:
       - "127.0.0.1:8000:8000"
@@ -32,3 +40,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:

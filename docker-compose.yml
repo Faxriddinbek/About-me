@@ -31,6 +31,9 @@ services:
       CORS_ORIGINS: "http://localhost:3000,http://localhost:5173"
       ADMIN_TOKEN: dev-admin-token
       TRUST_PROXY: "false"
+      # Same path as production, so "works locally, breaks deployed" cannot come
+      # from the upload directory. Only what is mounted there differs.
+      UPLOAD_DIR: /data/uploads
     ports:
       # Host port is overridable because 8000 is often already taken by another
       # local stack; the container always listens on 8000 internally.
@@ -40,8 +43,10 @@ services:
       - ./app:/app/app
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
-      # Uploaded images, on the host so they survive `docker compose down`.
-      - ./uploads:/app/uploads
+      # Uploaded images. A host directory rather than a named volume: in
+      # development it is useful to open the files straight from the project
+      # folder. Production mounts a named volume at the same path instead.
+      - ./uploads:/data/uploads
     depends_on:
       db:
         condition: service_healthy
