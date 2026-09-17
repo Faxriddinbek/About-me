@@ -114,6 +114,44 @@ async def test_admin_media_full_crud(client: httpx.AsyncClient) -> None:
     assert (await client.get("/api/v1/media")).json()["total"] == 0
 
 
+async def test_admin_media_list_paginates_with_offset(client: httpx.AsyncClient) -> None:
+    """The admin list walks the whole table page by page, hidden items included.
+
+    The panel asks for one page at a time, so ``offset`` has to keep the order
+    the first page came from — otherwise paging would skip or repeat rows.
+    """
+    for i in range(5):
+        await client.post(
+            "/api/v1/admin/media",
+            json=_media_payload(
+                url=f"https://cdn.example/{i}.jpg",
+                display_order=i,
+                is_visible=i % 2 == 0,
+            ),
+            headers=ADMIN_HEADERS,
+        )
+
+    first = await client.get(
+        "/api/v1/admin/media", params={"limit": 2, "offset": 0}, headers=ADMIN_HEADERS
+    )
+    assert first.status_code == 200
+    body = first.json()
+    assert body["total"] == 5  # hidden items are counted too
+    assert body["limit"] == 2 and body["offset"] == 0
+    assert [item["display_order"] for item in body["items"]] == [0, 1]
+
+    second = await client.get(
+        "/api/v1/admin/media", params={"limit": 2, "offset": 2}, headers=ADMIN_HEADERS
+    )
+    assert [item["display_order"] for item in second.json()["items"]] == [2, 3]
+
+    # The last page is short rather than empty, and nothing repeats.
+    last = await client.get(
+        "/api/v1/admin/media", params={"limit": 2, "offset": 4}, headers=ADMIN_HEADERS
+    )
+    assert [item["display_order"] for item in last.json()["items"]] == [4]
+
+
 async def test_admin_contacts_list_and_mark_read(client: httpx.AsyncClient) -> None:
     # A public submission creates an unread message.
     await client.post(
