@@ -46,6 +46,38 @@ TEST_ADMIN_TOKEN = "test-admin-token"
 ADMIN_HEADERS = {"X-Admin-Token": TEST_ADMIN_TOKEN}
 
 
+def make_image(
+    width: int = 800,
+    height: int = 600,
+    *,
+    fmt: str = "JPEG",
+    mode: str = "RGB",
+    exif: Any | None = None,
+) -> bytes:
+    """Encode a real test image.
+
+    Uploads are decoded and re-encoded, so tests cannot hand the API a
+    hand-written byte string and call it a photo.
+    """
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    fill = "red" if mode == "RGB" else (255, 0, 0, 128)
+    image = Image.new(mode, (width, height), fill)
+    if exif is not None:
+        image.save(buffer, fmt, exif=exif)
+    else:
+        image.save(buffer, fmt)
+    return buffer.getvalue()
+
+
+def upload_files(name: str, data: bytes, content_type: str = "image/jpeg") -> dict:
+    """The multipart payload shape the upload endpoint expects."""
+    return {"file": (name, data, content_type)}
+
+
 @pytest_asyncio.fixture
 async def engine() -> AsyncIterator[Any]:
     """A fresh in-memory database per test, on one shared connection.

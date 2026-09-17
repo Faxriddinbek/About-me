@@ -14,9 +14,14 @@ from app.schemas.media import MediaAdminOut, MediaCreate, MediaOut, MediaUpdate
 
 
 class UploadOut(BaseModel):
-    """Where an uploaded file now lives, ready to be stored on a media item."""
+    """Where an upload now lives: one image, stored in two sizes.
+
+    Both belong on the media item — the thumbnail is what a grid of tiles
+    loads, the url what a full view does.
+    """
 
     url: str
+    thumbnail_url: str
 
 router = APIRouter(
     prefix="/admin/media",
@@ -59,16 +64,18 @@ async def list_media(
     status_code=status.HTTP_201_CREATED,
     summary="Upload an image",
     description=(
-        "Store an image file and return the URL to serve it from. Create the "
-        "media item separately with that URL — uploading and recording are kept "
-        "apart so a failed save never orphans a row. Requires a valid "
+        "Re-encode an image into a full-size and a thumbnail WebP, and return "
+        "both URLs. Camera metadata is dropped and orientation applied. Create "
+        "the media item separately with those URLs — uploading and recording "
+        "are kept apart so a failed save never orphans a row. Requires a valid "
         "X-Admin-Token."
     ),
 )
 async def upload_file(
     storage: FileStorageDep, file: Annotated[UploadFile, File()]
 ) -> UploadOut:
-    return UploadOut(url=await storage.save(file))
+    stored = await storage.save(file)
+    return UploadOut(url=stored.url, thumbnail_url=stored.thumbnail_url)
 
 
 @router.post(

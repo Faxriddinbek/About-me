@@ -121,7 +121,7 @@ ASGI client).
 | POST/PATCH/DELETE | `/api/v1/admin/projects[/{id}]` | admin | Manage projects.                   |
 | GET    | `/api/v1/files/{filename}`              | —     | Serve an uploaded image.           |
 | GET    | `/api/v1/admin/media`                   | admin | List every media item, hidden included. |
-| POST   | `/api/v1/admin/media/upload`            | admin | Upload an image, returns its URL.  |
+| POST   | `/api/v1/admin/media/upload`            | admin | Upload an image; returns a full-size and a thumbnail URL. |
 | POST/PATCH/DELETE | `/api/v1/admin/media[/{id}]`    | admin | Manage media.                      |
 | GET    | `/api/v1/admin/contacts?unread_only=`   | admin | List contact messages.             |
 | PATCH  | `/api/v1/admin/contacts/{id}/read`      | admin | Mark a message read.               |
@@ -133,8 +133,21 @@ because they are the same kind of asset, differing only in where they surface.
 Uploads are stored by this service rather than a hosted image CDN, because the
 usual providers refuse sign-ups from Uzbekistan. Only image extensions are
 accepted, the stored filename is random (so a client filename can never steer a
-write), and the size limit is enforced while streaming rather than trusting
+write), and the size limit is enforced while reading rather than trusting
 `Content-Length`.
+
+Nothing is kept as it arrived. Each upload is re-encoded into two WebP files —
+a 1600px `url` for the full view and a 600px `thumbnail_url` for grid tiles —
+and `POST /api/v1/admin/media/upload` returns both, to be stored on the media
+item. A 5 MB phone photo ends up around 300 KB, which is the difference between
+a gallery that opens on mobile data and one that does not. Re-encoding also
+drops the camera metadata, GPS coordinates included; orientation is read and
+applied to the pixels first, so portrait photos are not served on their side.
+Images smaller than a target width are left at their own size rather than
+upscaled, and animated GIFs are stored untouched, since re-encoding them frame
+by frame tends to produce a subtly broken animation. SVG is not accepted at
+all: it is a script-bearing document, and serving one from our own origin would
+let that script run there.
 
 Deleting a media item deletes the file behind it, as does replacing its `url` —
 but only after the transaction commits, and only for files this service stored
@@ -297,6 +310,11 @@ It considers media files, media cover images and project screenshots — hidden
 rows included, which is why it reads the database rather than the API — and it
 skips anything uploaded in the last hour (`--min-age-minutes`), so a file still
 sitting in an unsaved admin form is never taken away.
+
+`scripts/backfill_thumbnails.py` is its counterpart, needed once after a deploy
+that introduces the two-size pipeline: it derives the missing thumbnail for
+media stored as a single file. Same shape — a report by default, `--apply` to
+record the result, and safe to re-run.
 
 ## Connecting the frontend
 
