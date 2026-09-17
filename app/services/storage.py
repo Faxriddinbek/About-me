@@ -17,6 +17,14 @@ from fastapi import UploadFile
 
 from app.core.config import Settings
 from app.core.exceptions import ValidationError
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
+# The public prefix every stored file is served under. A URL that does not start
+# with it belongs to someone else (YouTube, an external CDN) and is never a path
+# this service may touch.
+PUBLIC_URL_PREFIX = "/api/v1/files/"
 
 # Only formats a browser renders natively. Whitelisting extensions (rather than
 # trusting the client's Content-Type, which is trivially spoofed) is what keeps
@@ -85,21 +93,47 @@ class FileStorage:
             destination.unlink(missing_ok=True)
             raise ValidationError("The uploaded file is empty.")
 
-        return f"/api/v1/files/{name}"
+        return f"{PUBLIC_URL_PREFIX}{name}"
 
-    def delete(self, url: str) -> bool:
+    @staticmethod
+    def owns(url: str | None) -> bool:
+        """Whether ``url`` points at a file this service stored.
+
+        The single gate for every deletion: a media item may just as well hold a
+        YouTube link or an external image, and deleting is irreversible, so the
+        question is answered in one place rather than at each call site. The
+        remainder after the prefix must be a bare filename with a known image
+        extension — a nested path or an unknown suffix is not something we wrote.
+        """
+        if not url or not url.startswith(PUBLIC_URL_PREFIX):
+            return False
+
+        name = url[len(PUBLIC_URL_PREFIX) :]
+        return (
+            bool(name)
+            and name == Path(name).name
+            and Path(name).suffix.lower() in ALLOWED_EXTENSIONS
+        )
+
+    def delete(self, url: str | None) -> bool:
         """Remove a previously stored file. Returns whether anything was deleted.
 
-        Only the final path segment is used, so a crafted URL cannot reach
-        outside the upload directory.
+        Never raises: this runs after the response has been sent, where an
+        exception could no longer be reported to anyone, and a file that failed
+        to disappear is debris the cleanup script can collect later.
         """
-        name = Path(url).name
-        if not name:
+        if not self.owns(url):
             return False
 
-        target = self._settings.upload_path / name
-        if not target.is_file():
+        target = self._settings.upload_path / Path(str(url)).name
+        try:
+            if not target.is_file():
+                # Already gone — deleted by hand, or by a retried request.
+                return False
+            target.unlink()
+        except OSError as exc:
+            logger.warning("Could not delete uploaded file %s: %s", target, exc)
             return False
 
-        target.unlink()
+        logger.info("Deleted uploaded file %s", target.name)
         return True

@@ -9,25 +9,19 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol
+from typing import Any
 
 from app.core.exceptions import NotFoundError, RateLimitError
 from app.repositories.contact import ContactRepository
 from app.schemas.common import Page
 from app.schemas.contact import ContactCreate, ContactOut
+from app.services.background import BackgroundRunner
 from app.services.notification import NotificationService
 
 # Business rule: throttle submissions per source IP. Named constants (not inline
 # literals) so the policy is explicit and easy to tune.
 _MAX_MESSAGES_PER_WINDOW = 3
 _RATE_LIMIT_WINDOW = timedelta(hours=1)
-
-
-class BackgroundRunner(Protocol):
-    """Structural type for a background-task scheduler such as FastAPI's
-    ``BackgroundTasks``. Declared here so this service never imports FastAPI."""
-
-    def add_task(self, func: Any, /, *args: Any, **kwargs: Any) -> None: ...
 
 
 class ContactService:

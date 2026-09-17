@@ -60,6 +60,13 @@ def get_contact_repository(session: SessionDep) -> ContactRepository:
 
 
 # --- Service providers -------------------------------------------------------
+def get_file_storage(settings: SettingsDep) -> FileStorage:
+    return FileStorage(settings)
+
+
+FileStorageDep = Annotated[FileStorage, Depends(get_file_storage)]
+
+
 def get_notification_service(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> NotificationService:
@@ -74,8 +81,11 @@ def get_project_service(
 
 def get_media_service(
     repo: Annotated[MediaRepository, Depends(get_media_repository)],
+    storage: FileStorageDep,
 ) -> MediaService:
-    return MediaService(repo)
+    # The service needs the storage because deleting a media item must also
+    # delete the file behind it.
+    return MediaService(repo, storage)
 
 
 def get_contact_service(
@@ -85,14 +95,9 @@ def get_contact_service(
     return ContactService(repo, notifier)
 
 
-def get_file_storage(settings: SettingsDep) -> FileStorage:
-    return FileStorage(settings)
-
-
 ProjectServiceDep = Annotated[ProjectService, Depends(get_project_service)]
 MediaServiceDep = Annotated[MediaService, Depends(get_media_service)]
 ContactServiceDep = Annotated[ContactService, Depends(get_contact_service)]
-FileStorageDep = Annotated[FileStorage, Depends(get_file_storage)]
 
 
 # --- Authentication ----------------------------------------------------------
