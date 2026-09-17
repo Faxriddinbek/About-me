@@ -6,7 +6,7 @@ mounts at ``/api/v1`` so API versioning lives in exactly one place.
 
 from fastapi import APIRouter
 
-from app.api.v1 import contact, media, projects
+from app.api.v1 import contact, files, media, projects
 from app.api.v1.admin import contacts as admin_contacts
 from app.api.v1.admin import media as admin_media
 from app.api.v1.admin import projects as admin_projects
@@ -17,6 +17,7 @@ api_router = APIRouter()
 api_router.include_router(projects.router)
 api_router.include_router(media.router)
 api_router.include_router(contact.router)
+api_router.include_router(files.router)
 
 # Admin (each router requires a valid X-Admin-Token)
 api_router.include_router(admin_projects.router)

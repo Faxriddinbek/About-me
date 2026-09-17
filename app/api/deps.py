@@ -26,13 +26,16 @@ from app.services.contact import ContactService
 from app.services.media import MediaService
 from app.services.notification import NotificationService
 from app.services.project import ProjectService
+from app.services.storage import FileStorage
 
 __all__ = [
     "ContactServiceDep",
+    "FileStorageDep",
     "LangParam",
     "MediaServiceDep",
     "PaginationParams",
     "ProjectServiceDep",
+    "SettingsDep",
     "get_client_ip",
     "get_session",
     "get_settings",
@@ -40,6 +43,7 @@ __all__ = [
 ]
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 # --- Repository providers ----------------------------------------------------
@@ -81,9 +85,14 @@ def get_contact_service(
     return ContactService(repo, notifier)
 
 
+def get_file_storage(settings: SettingsDep) -> FileStorage:
+    return FileStorage(settings)
+
+
 ProjectServiceDep = Annotated[ProjectService, Depends(get_project_service)]
 MediaServiceDep = Annotated[MediaService, Depends(get_media_service)]
 ContactServiceDep = Annotated[ContactService, Depends(get_contact_service)]
+FileStorageDep = Annotated[FileStorage, Depends(get_file_storage)]
 
 
 # --- Authentication ----------------------------------------------------------

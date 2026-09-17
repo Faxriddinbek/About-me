@@ -9,6 +9,7 @@ than re-reading the environment ad hoc.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import model_validator
@@ -51,6 +52,15 @@ class Settings(BaseSettings):
     # bypass rate limiting. When false the header is ignored.
     TRUST_PROXY: bool = False
 
+    # --- Uploads -------------------------------------------------------------
+    # Directory that admin-uploaded images are written to and served from.
+    # In production this MUST point at a mounted volume — a container's own
+    # filesystem is discarded on every deploy, taking the uploads with it.
+    UPLOAD_DIR: str = "./uploads"
+    # Images only. Anything longer than a short clip belongs on a video host,
+    # which streams adaptively instead of forcing a full download.
+    MAX_UPLOAD_MB: int = 15
+
     # --- Secrets -------------------------------------------------------------
     ADMIN_TOKEN: str = ""  # required in prod; guards write endpoints
 
@@ -62,6 +72,17 @@ class Settings(BaseSettings):
     def cors_origins(self) -> list[str]:
         """Parse the raw comma-separated origins into a clean, de-blanked list."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def upload_path(self) -> Path:
+        """The upload directory as a ``Path``, created if it does not exist."""
+        path = Path(self.UPLOAD_DIR)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @property
+    def max_upload_bytes(self) -> int:
+        return self.MAX_UPLOAD_MB * 1024 * 1024
 
     @property
     def is_prod(self) -> bool:

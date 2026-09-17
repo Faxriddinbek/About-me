@@ -22,6 +22,9 @@ env/
 *.sqlite
 *.sqlite3
 
+# Admin-uploaded images — user content, not source
+/uploads/
+
 # Test / tooling caches
 .pytest_cache/
 .ruff_cache/

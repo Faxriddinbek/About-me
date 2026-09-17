@@ -10,7 +10,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import MediaItem, MediaType
+from app.models import MediaItem, MediaPlacement, MediaType
 from app.schemas.common import Lang, resolve_translation
 
 
@@ -20,6 +20,9 @@ class MediaCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     media_type: MediaType
+    # Defaults to the gallery so callers written before placements existed —
+    # including the seed script — keep working unchanged.
+    placement: MediaPlacement = MediaPlacement.GALLERY
     url: str = Field(min_length=1, max_length=500)
     thumbnail_url: str | None = Field(default=None, max_length=500)
     title_uz: str | None = Field(default=None, max_length=255)
@@ -34,6 +37,7 @@ class MediaUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     media_type: MediaType | None = None
+    placement: MediaPlacement | None = None
     url: str | None = Field(default=None, min_length=1, max_length=500)
     thumbnail_url: str | None = Field(default=None, max_length=500)
     title_uz: str | None = Field(default=None, max_length=255)
@@ -47,6 +51,7 @@ class MediaOut(BaseModel):
 
     id: int
     media_type: MediaType
+    placement: MediaPlacement
     url: str
     thumbnail_url: str | None
     title: str | None
@@ -61,6 +66,7 @@ class MediaOut(BaseModel):
         return cls(
             id=media.id,
             media_type=media.media_type,
+            placement=media.placement,
             url=media.url,
             thumbnail_url=media.thumbnail_url,
             title=resolve_translation(media.title_uz, media.title_en, lang),
@@ -69,3 +75,26 @@ class MediaOut(BaseModel):
             created_at=media.created_at,
             updated_at=media.updated_at,
         )
+
+
+class MediaAdminOut(BaseModel):
+    """Raw view for the admin panel.
+
+    Unlike ``MediaOut`` this keeps both language columns separate and is
+    returned for hidden items too — the admin edits the stored row, so it must
+    see exactly what is stored rather than a resolved presentation of it.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    media_type: MediaType
+    placement: MediaPlacement
+    url: str
+    thumbnail_url: str | None
+    title_uz: str | None
+    title_en: str | None
+    display_order: int
+    is_visible: bool
+    created_at: datetime
+    updated_at: datetime

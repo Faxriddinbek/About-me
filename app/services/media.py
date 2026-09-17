@@ -1,12 +1,12 @@
-"""Media business logic (mirrors ``ProjectService`` with a media-type filter)."""
+"""Media business logic (mirrors ``ProjectService`` with type/placement filters)."""
 
 from __future__ import annotations
 
 from app.core.exceptions import NotFoundError
-from app.models import MediaType
+from app.models import MediaPlacement, MediaType
 from app.repositories.media import MediaRepository
 from app.schemas.common import Lang, Page
-from app.schemas.media import MediaCreate, MediaOut, MediaUpdate
+from app.schemas.media import MediaAdminOut, MediaCreate, MediaOut, MediaUpdate
 
 
 class MediaService:
@@ -14,14 +14,42 @@ class MediaService:
         self._media = media
 
     async def list_visible(
-        self, *, lang: Lang, media_type: MediaType | None = None, limit: int, offset: int
+        self,
+        *,
+        lang: Lang,
+        media_type: MediaType | None = None,
+        placement: MediaPlacement | None = None,
+        limit: int,
+        offset: int,
     ) -> Page[MediaOut]:
         rows = await self._media.list_visible(
-            media_type=media_type, limit=limit, offset=offset
+            media_type=media_type, placement=placement, limit=limit, offset=offset
         )
-        total = await self._media.count_visible(media_type=media_type)
+        total = await self._media.count_visible(
+            media_type=media_type, placement=placement
+        )
         return Page[MediaOut](
             items=[MediaOut.from_model(row, lang) for row in rows],
+            total=total,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def list_all(
+        self,
+        *,
+        media_type: MediaType | None = None,
+        placement: MediaPlacement | None = None,
+        limit: int,
+        offset: int,
+    ) -> Page[MediaAdminOut]:
+        """Admin listing: every item, hidden ones included, both languages raw."""
+        rows = await self._media.list_all(
+            media_type=media_type, placement=placement, limit=limit, offset=offset
+        )
+        total = await self._media.count_all(media_type=media_type, placement=placement)
+        return Page[MediaAdminOut](
+            items=[MediaAdminOut.model_validate(row) for row in rows],
             total=total,
             limit=limit,
             offset=offset,

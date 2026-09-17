@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from app.api.deps import LangParam, MediaServiceDep, PaginationParams
-from app.models import MediaType
+from app.models import MediaPlacement, MediaType
 from app.schemas.common import Page
 from app.schemas.media import MediaOut
 
@@ -21,7 +21,8 @@ router = APIRouter(prefix="/media", tags=["media"])
     summary="List visible media",
     description=(
         "Return a paginated list of visible media items, optionally filtered by "
-        "type (photo|video), with titles resolved to the requested language."
+        "type (photo|video) and placement (hero|gallery), with titles resolved "
+        "to the requested language."
     ),
 )
 async def list_media(
@@ -31,10 +32,15 @@ async def list_media(
     media_type: Annotated[
         MediaType | None, Query(alias="type", description="Filter by media type.")
     ] = None,
+    placement: Annotated[
+        MediaPlacement | None,
+        Query(description="Filter by placement: hero (home carousel) or gallery."),
+    ] = None,
 ) -> Page[MediaOut]:
     return await service.list_visible(
         lang=lang,
         media_type=media_type,
+        placement=placement,
         limit=pagination.limit,
         offset=pagination.offset,
     )
