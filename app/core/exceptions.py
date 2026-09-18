@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -98,13 +99,19 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    """Return request-validation failures in the same envelope as domain errors."""
+    """Return request-validation failures in the same envelope as domain errors.
+
+    ``exc.errors()`` is not plain JSON: when a body cannot be parsed at all
+    the error echoes the raw request as ``bytes``, which ``JSONResponse``
+    refuses to encode. Without ``jsonable_encoder`` that refusal escapes the
+    handler and a 422 the caller could act on arrives as an opaque 500.
+    """
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=_error_body(
             "validation_error",
             "The request failed validation.",
-            exc.errors(),
+            jsonable_encoder(exc.errors()),
         ),
     )
 
