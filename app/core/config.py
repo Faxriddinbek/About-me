@@ -64,6 +64,17 @@ class Settings(BaseSettings):
     # --- Secrets -------------------------------------------------------------
     ADMIN_TOKEN: str = ""  # required in prod; guards write endpoints
 
+    # --- AI chat (optional) --------------------------------------------------
+    # Any OpenAI-compatible chat-completions API: Gemini, Groq, OpenRouter, or a
+    # self-hosted Ollama/vLLM. Switching provider is a config change, not code.
+    # With no key the chat endpoint answers 503 and the rest of the site is
+    # unaffected.
+    AI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    AI_MODEL: str = "gemini-2.5-flash"
+    AI_API_KEY: str = ""
+    AI_MAX_OUTPUT_TOKENS: int = 700
+    AI_TIMEOUT_SECONDS: float = 30.0
+
     # --- Telegram (optional) -------------------------------------------------
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
@@ -83,6 +94,10 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.MAX_UPLOAD_MB * 1024 * 1024
+
+    @property
+    def ai_enabled(self) -> bool:
+        return bool(self.AI_API_KEY and self.AI_BASE_URL and self.AI_MODEL)
 
     @property
     def is_prod(self) -> bool:
