@@ -26,7 +26,10 @@ CACHE_CONTROL = "public, max-age=31536000, immutable"
     "/{filename}",
     response_class=FileResponse,
     summary="Serve an uploaded file",
-    description="Return a previously uploaded image. Responds 404 if it is gone.",
+    description=(
+        "Return a previously uploaded image or video. Range requests are "
+        "supported, so a video can be seeked. Responds 404 if it is gone."
+    ),
 )
 async def get_file(filename: str, settings: SettingsDep) -> Response:
     # Reduce to the bare name: even though the path parameter cannot contain a

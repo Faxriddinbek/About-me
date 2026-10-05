@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     # Images only. Anything longer than a short clip belongs on a video host,
     # which streams adaptively instead of forcing a full download.
     MAX_UPLOAD_MB: int = 15
+    # Videos are stored as they arrive (no transcoding), so they get their own,
+    # much larger ceiling. Whatever proxy sits in front (nginx) must allow at
+    # least this much too: ``client_max_body_size``.
+    MAX_VIDEO_UPLOAD_MB: int = 2048
+    # A video upload is refused when it would leave less free space than this
+    # on the upload volume, so a big file can never fill the disk the database
+    # and the OS also live on.
+    MIN_FREE_DISK_MB: int = 2048
 
     # --- Secrets -------------------------------------------------------------
     ADMIN_TOKEN: str = ""  # required in prod; guards write endpoints
@@ -83,6 +91,14 @@ class Settings(BaseSettings):
     @property
     def max_upload_bytes(self) -> int:
         return self.MAX_UPLOAD_MB * 1024 * 1024
+
+    @property
+    def max_video_upload_bytes(self) -> int:
+        return self.MAX_VIDEO_UPLOAD_MB * 1024 * 1024
+
+    @property
+    def min_free_disk_bytes(self) -> int:
+        return self.MIN_FREE_DISK_MB * 1024 * 1024
 
     @property
     def is_prod(self) -> bool:
