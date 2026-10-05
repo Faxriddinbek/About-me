@@ -72,6 +72,18 @@ class RateLimitError(AppError):
     http_status = status.HTTP_429_TOO_MANY_REQUESTS
 
 
+class ServiceUnavailableError(AppError):
+    code = "service_unavailable"
+    message = "The service is temporarily unavailable."
+    http_status = status.HTTP_503_SERVICE_UNAVAILABLE
+
+
+class UpstreamError(AppError):
+    code = "upstream_error"
+    message = "An upstream service failed."
+    http_status = status.HTTP_502_BAD_GATEWAY
+
+
 def _error_body(code: str, message: str, detail: Any | None) -> dict[str, Any]:
     """Build the canonical error envelope shared by every handler."""
     return {"error": {"code": code, "message": message, "detail": detail}}
