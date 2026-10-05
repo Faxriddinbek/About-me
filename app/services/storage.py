@@ -1,4 +1,11 @@
-"""Persisting admin-uploaded images as two web-sized derivatives.
+"""Persisting admin-uploaded images and videos.
+
+Images are re-encoded into two web-sized derivatives (below). Videos are stored
+byte-for-byte as they arrived — transcoding needs ffmpeg and minutes of CPU per
+file — and are streamed to disk in chunks, so a multi-gigabyte upload never has
+to fit in memory. They are served back with HTTP Range support (Starlette's
+``FileResponse``), which is what lets a browser seek without downloading the
+whole file first.
 
 Third-party image hosts are the usual answer, but the two obvious ones refuse
 sign-ups from Uzbekistan, so uploads are stored by the application itself.
@@ -21,7 +28,9 @@ delete every uploaded image while leaving the database rows pointing at them.
 
 from __future__ import annotations
 
+import os
 import secrets
+import shutil
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -40,15 +49,27 @@ logger = get_logger(__name__)
 # this service may touch.
 PUBLIC_URL_PREFIX = "/api/v1/files/"
 
-# What this service will serve. Everything it writes is WebP, except animated
+# Images this service accepts. Everything it writes is WebP, except animated
 # images, which keep their original format — hence the other entries.
-ALLOWED_EXTENSIONS = {
+IMAGE_EXTENSIONS = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
     ".webp": "image/webp",
     ".gif": "image/gif",
 }
+
+# Videos are kept as uploaded. MP4 (H.264) plays in every browser; WebM in all
+# but old Safari; MOV only when its codec is H.264 (an iPhone's HEVC .mov will
+# not play in Chrome or Firefox — export it as MP4 first).
+VIDEO_EXTENSIONS = {
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+}
+
+# What this service will serve, and recognise as its own when deleting.
+ALLOWED_EXTENSIONS = {**IMAGE_EXTENSIONS, **VIDEO_EXTENSIONS}
 
 # What it will accept from a client. SVG is deliberately absent: it is a
 # script-bearing document rather than a bitmap, and serving one from our own
@@ -71,11 +92,36 @@ CHUNK_BYTES = 1024 * 1024
 
 
 @dataclass(frozen=True)
-class StoredImage:
-    """The two URLs one upload produces: what to show, and what to show first."""
+class StoredFile:
+    """Where one upload now lives.
+
+    An image comes back in two sizes. A video has no thumbnail of its own —
+    the admin uploads a cover image for it separately — so ``thumbnail_url``
+    is ``None`` for videos.
+    """
 
     url: str
-    thumbnail_url: str
+    thumbnail_url: str | None
+    media_type: str = "photo"
+
+
+# Kept for callers written when only images could be uploaded.
+StoredImage = StoredFile
+
+
+def _looks_like_video(extension: str, head: bytes) -> bool:
+    """Check the file's first bytes against its claimed container format.
+
+    The extension is only a claim; this stops, say, an HTML file renamed to
+    .mp4 from being stored and served from our own origin.
+    """
+    if extension == ".webm":
+        return head[:4] == b"\x1a\x45\xdf\xa3"  # EBML header
+    # MP4 and MOV are both ISO base media files: an atom size, then its type.
+    atom = head[4:8]
+    if extension == ".mp4":
+        return atom == b"ftyp"
+    return atom in {b"ftyp", b"moov", b"mdat", b"wide", b"free", b"skip"}
 
 
 class FileStorage:
@@ -92,14 +138,19 @@ class FileStorage:
             )
         return suffix
 
-    async def save(self, upload: UploadFile) -> StoredImage:
-        """Store ``upload`` as two derivatives and return their public URLs.
+    async def save(self, upload: UploadFile) -> StoredFile:
+        """Store ``upload`` and return its public URL(s).
+
+        Videos are streamed to disk unchanged; images become two derivatives.
 
         Stored names are random rather than derived from the client's filename:
         that removes any path-traversal question entirely, and means two uploads
         called "photo.jpg" cannot overwrite one another.
         """
         extension = self._extension(upload.filename)
+        if extension in VIDEO_EXTENSIONS:
+            return await self._save_video(upload, extension)
+
         data = await self._read_within_limit(upload)
         name = secrets.token_urlsafe(16)
 
@@ -109,7 +160,7 @@ class FileStorage:
             # they are stored exactly as they arrived.
             if self._frame_count(image) > 1:
                 url = self._url_of(self._write_bytes(f"{name}{extension}", data))
-                return StoredImage(url=url, thumbnail_url=url)
+                return StoredFile(url=url, thumbnail_url=url)
 
             upright = self._upright(image)
             written: list[Path] = []
@@ -128,7 +179,60 @@ class FileStorage:
                     path.unlink(missing_ok=True)
                 raise
 
-        return StoredImage(url=self._url_of(large), thumbnail_url=self._url_of(thumb))
+        return StoredFile(url=self._url_of(large), thumbnail_url=self._url_of(thumb))
+
+    async def _save_video(self, upload: UploadFile, extension: str) -> StoredFile:
+        """Stream a video to disk in chunks, enforcing size, format and free space.
+
+        It is written under a dot-prefixed ``.part`` name first and renamed only
+        once complete, so a half-written file is never served, and the orphan
+        cleanup (which skips dot-files) never races an upload in progress.
+        """
+        limit = self._settings.max_video_upload_bytes
+        too_big = f"Video is larger than {self._settings.MAX_VIDEO_UPLOAD_MB} MB."
+        directory = self._settings.upload_path
+
+        # The size Starlette measured while spooling the body, when known.
+        if upload.size is not None and upload.size > limit:
+            await upload.close()
+            raise ValidationError(too_big)
+        self._ensure_free_space(directory, upload.size or 0)
+
+        name = f"{secrets.token_urlsafe(16)}{extension}"
+        final = directory / name
+        partial = directory / f".{name}.part"
+        size = 0
+        try:
+            with partial.open("wb") as out:
+                while chunk := await upload.read(CHUNK_BYTES):
+                    if size == 0 and not _looks_like_video(extension, chunk[:16]):
+                        raise ValidationError(
+                            "That file is not a readable video. Upload an mp4, webm or mov."
+                        )
+                    size += len(chunk)
+                    if size > limit:
+                        raise ValidationError(too_big)
+                    out.write(chunk)
+            if size == 0:
+                raise ValidationError("The uploaded file is empty.")
+            os.replace(partial, final)
+        except BaseException:
+            partial.unlink(missing_ok=True)
+            raise
+        finally:
+            await upload.close()
+
+        logger.info("Stored video %s (%.1f MB)", name, size / (1024 * 1024))
+        return StoredFile(url=self._url_of(final), thumbnail_url=None, media_type="video")
+
+    def _ensure_free_space(self, directory: Path, incoming: int) -> None:
+        """Refuse an upload that would leave the volume below the safety margin."""
+        free = shutil.disk_usage(directory).free
+        if free - incoming < self._settings.min_free_disk_bytes:
+            logger.error(
+                "Refusing upload: %.1f MB free on %s", free / (1024 * 1024), directory
+            )
+            raise ValidationError("Not enough free disk space on the server for this file.")
 
     @staticmethod
     def _decode(data: bytes) -> Image.Image:
@@ -173,6 +277,8 @@ class FileStorage:
         """
         if not self.owns(url):
             return None
+        if Path(str(url)).suffix.lower() in VIDEO_EXTENSIONS:
+            return None  # no frame extraction; videos get an uploaded cover
 
         source = self._settings.upload_path / Path(str(url)).name
         if not source.is_file():

@@ -14,14 +14,17 @@ from app.schemas.media import MediaAdminOut, MediaCreate, MediaOut, MediaUpdate
 
 
 class UploadOut(BaseModel):
-    """Where an upload now lives: one image, stored in two sizes.
+    """Where an upload now lives.
 
-    Both belong on the media item — the thumbnail is what a grid of tiles
-    loads, the url what a full view does.
+    An image is stored in two sizes; both belong on the media item — the
+    thumbnail is what a grid of tiles loads, the url what a full view does.
+    A video is stored once and has no thumbnail (``null``); upload a cover
+    image separately and put its URL in the item's ``thumbnail_url``.
     """
 
     url: str
-    thumbnail_url: str
+    thumbnail_url: str | None
+    media_type: MediaType
 
 router = APIRouter(
     prefix="/admin/media",
@@ -62,10 +65,12 @@ async def list_media(
     "/upload",
     response_model=UploadOut,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload an image",
+    summary="Upload an image or a video",
     description=(
-        "Re-encode an image into a full-size and a thumbnail WebP, and return "
-        "both URLs. Camera metadata is dropped and orientation applied. Create "
+        "Images (jpg, png, webp, gif) are re-encoded into a full-size and a "
+        "thumbnail WebP; camera metadata is dropped and orientation applied. "
+        "Videos (mp4, webm, mov) are stored unchanged, up to MAX_VIDEO_UPLOAD_MB, "
+        "and served with HTTP Range support so they can be seeked. Create "
         "the media item separately with those URLs — uploading and recording "
         "are kept apart so a failed save never orphans a row. Requires a valid "
         "X-Admin-Token."
@@ -75,7 +80,11 @@ async def upload_file(
     storage: FileStorageDep, file: Annotated[UploadFile, File()]
 ) -> UploadOut:
     stored = await storage.save(file)
-    return UploadOut(url=stored.url, thumbnail_url=stored.thumbnail_url)
+    return UploadOut(
+        url=stored.url,
+        thumbnail_url=stored.thumbnail_url,
+        media_type=MediaType(stored.media_type),
+    )
 
 
 @router.post(
