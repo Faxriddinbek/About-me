@@ -152,6 +152,32 @@ async def test_an_animated_gif_is_stored_untouched(client: httpx.AsyncClient) ->
     assert served.content == original
 
 
+def make_mpo() -> bytes:
+    """A phone-camera JPEG: a still photo with a second, hidden frame."""
+    buffer = BytesIO()
+    main = Image.new("RGB", (2400, 1600), "orange")
+    hidden = Image.new("RGB", (640, 480), "gray")
+    main.save(buffer, "MPO", save_all=True, append_images=[hidden])
+    return buffer.getvalue()
+
+
+async def test_a_multi_frame_phone_jpeg_is_still_re_encoded(
+    client: httpx.AsyncClient,
+) -> None:
+    """MPO has two frames but is not an animation: it gets the WebP pipeline."""
+    original = make_mpo()
+    assert Image.open(BytesIO(original)).format == "MPO"
+
+    body = await upload(client, original, name="IMG_0001.jpg")
+
+    assert body["url"].endswith(".webp")
+    assert body["thumbnail_url"].endswith("_thumb.webp")
+    assert body["url"] != body["thumbnail_url"]
+    large = await fetch_image(client, body["url"])
+    assert large.format == "WEBP"
+    assert large.width < 2400
+
+
 async def test_svg_uploads_are_refused(client: httpx.AsyncClient) -> None:
     """An SVG is a script-bearing document, not a bitmap."""
     svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'

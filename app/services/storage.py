@@ -82,6 +82,10 @@ ACCEPTED_EXTENSIONS = frozenset(ALLOWED_EXTENSIONS)
 LARGE_WIDTH = 1600
 THUMB_WIDTH = 600
 
+# Formats whose multi-frame files are animations. MPO (multi-frame JPEG from
+# phone cameras) is deliberately absent: it is a still photo.
+ANIMATED_FORMATS = frozenset({"GIF", "WEBP", "PNG"})
+
 # Quality is lower for the thumbnail: at tile size the difference is invisible,
 # and it is the file every visitor downloads a dozen of.
 LARGE_QUALITY = 80
@@ -158,7 +162,7 @@ class FileStorage:
             # An animated GIF re-encoded frame by frame is a good way to produce
             # a subtly broken animation. They are rare and already small, so
             # they are stored exactly as they arrived.
-            if self._frame_count(image) > 1:
+            if self._is_animated(image):
                 url = self._url_of(self._write_bytes(f"{name}{extension}", data))
                 return StoredFile(url=url, thumbnail_url=url)
 
@@ -251,11 +255,19 @@ class FileStorage:
             ) from exc
 
     @staticmethod
-    def _frame_count(image: Image.Image) -> int:
+    def _is_animated(image: Image.Image) -> bool:
+        """True only for a real animation (GIF, animated WebP/PNG).
+
+        Counting frames is not enough: phone cameras save MPO files - a JPEG
+        with a second, hidden depth/preview frame. Those are still photos and
+        must be re-encoded like any other, or they are served at full size.
+        """
+        if image.format not in ANIMATED_FORMATS:
+            return False
         try:
-            return int(getattr(image, "n_frames", 1))
+            return bool(getattr(image, "is_animated", False))
         except OSError:  # a damaged sequence; treat it as a single frame
-            return 1
+            return False
 
     @staticmethod
     def _upright(image: Image.Image) -> Image.Image:
@@ -285,7 +297,7 @@ class FileStorage:
             return None
 
         with self._decode(source.read_bytes()) as image:
-            if self._frame_count(image) > 1:
+            if self._is_animated(image):
                 return None  # animated: the original is the only version
             thumb = self._write_webp(
                 self._upright(image),
